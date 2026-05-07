@@ -2,78 +2,106 @@ using UnityEngine;
 using Sentry.Internal.Extensions;
 
 namespace MalumMenu;
+
 public static class MalumESP
 {
     private static bool _freecamActive;
     private static bool _resolutionChangeNeeded;
+    private static float _deltaTime;
+
+    public static string PlayerColorDot(Color color)
+    {
+        if (!CheatToggles.showPlayerDots)
+          return "";
+
+        string hexColor = ColorUtility.ToHtmlStringRGB(color);
+        return $"<size=80%><color=#{hexColor}>●</color></size>";
+    }
+
     public static void SporeCloudVision(Mushroom mushroom)
     {
-        if (CheatToggles.noShadows)
-        {
-            // Change the Z axis position of spore clouds as to make players appear above them
+        Vector3 current = mushroom.sporeMask.transform.position;
 
-            mushroom.sporeMask.transform.position = new Vector3(mushroom.sporeMask.transform.position.x, mushroom.sporeMask.transform.position.y, -1);
-            return;
-        }
+        float targetZ = CheatToggles.noShadows ? -1f : 5f;
 
-        // Normal Z axis position: 5f
-        mushroom.sporeMask.transform.position = new Vector3(mushroom.sporeMask.transform.position.x, mushroom.sporeMask.transform.position.y, 5f);
+        mushroom.sporeMask.transform.position = new Vector3(
+            current.x,
+            current.y,
+            targetZ
+        );
     }
 
     public static bool IsFullbrightActive()
     {
-        // Fullbright is automatically activated when zooming out, spectating other players, or "freecamming"
-        // This is done to avoid issues with shadows
+        Camera cam = Camera.main;
+        var follower = cam.GetComponent<FollowerCamera>();
 
-        return CheatToggles.noShadows || Camera.main.orthographicSize > 3f || Camera.main.gameObject.GetComponent<FollowerCamera>().Target != PlayerControl.LocalPlayer;
+        bool shadowsDisabled = CheatToggles.noShadows;
+        bool zoomedOut = cam.orthographicSize > 3f;
+        bool notFollowingPlayer = follower.Target != PlayerControl.LocalPlayer;
+
+        return shadowsDisabled || zoomedOut || notFollowingPlayer;
     }
 
     public static void ZoomOut(HudManager hudManager)
     {
-        if (CheatToggles.zoomOut)
+        if (!CheatToggles.zoomOut)
         {
-            if (hudManager.Chat.IsOpenOrOpening || PlayerCustomizationMenu.Instance || (Utils.isLobby && (FriendsListUI.Instance.IsOpen ||
-                GameStartManager.Instance.LobbyInfoPane.LobbyViewSettingsPane.gameObject.active || GameStartManager.Instance.RulesEditPanel))) return;
+            ResetZoom(hudManager);
+            return;
+        }
 
-            _resolutionChangeNeeded = true;
+        bool chatOpen = hudManager.Chat.IsOpenOrOpening;
+        bool customization = PlayerCustomizationMenu.Instance != null;
 
-            if (Input.GetAxis("Mouse ScrollWheel") < 0f ) // Zoom out
-            {
+        bool lobbyBlock =
+            Utils.isLobby &&
+            (
+                FriendsListUI.Instance.IsOpen ||
+                GameStartManager.Instance.LobbyInfoPane.LobbyViewSettingsPane.gameObject.active ||
+                GameStartManager.Instance.RulesEditPanel.active
+            );
 
-                // Both the main camera and the UI camera need to be adjusted
+        if (chatOpen || customization || lobbyBlock)
+            return;
 
-                Camera.main.orthographicSize++;
-                hudManager.UICamera.orthographicSize++;
+        _resolutionChangeNeeded = true;
 
-                // Utils.AdjustResolution() seems to be needed to properly sync the game's UI
-                // after a change in orthographicSize
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
 
-                Utils.AdjustResolution();
+        if (scroll == 0f)
+            return;
 
-            }
-            else if (Input.GetAxis("Mouse ScrollWheel") > 0f )
-            {
-                // Zoom in
-                if (!(Camera.main.orthographicSize > 3f)) return; // Never go below the default orthographicSize: 3f
+        Camera cam = Camera.main;
 
-                Camera.main.orthographicSize--;
-                hudManager.UICamera.orthographicSize--;
-
-                Utils.AdjustResolution();
-            }
+        if (scroll < 0f)
+        {
+            cam.orthographicSize++;
+            hudManager.UICamera.orthographicSize++;
         }
         else
         {
-            // orthographicSize is reset to default value: 3f
-            Camera.main.orthographicSize = 3f;
-            hudManager.UICamera.orthographicSize = 3f;
+            if (cam.orthographicSize <= 3f)
+                return;
 
-            // Utils.AdjustResolution() is invoked one last time to prevent issues with UI
-            if (_resolutionChangeNeeded)
-            {
-                Utils.AdjustResolution();
-                _resolutionChangeNeeded = false;
-            }
+            cam.orthographicSize--;
+            hudManager.UICamera.orthographicSize--;
+        }
+
+        Utils.AdjustResolution();
+    }
+
+    private static void ResetZoom(HudManager hudManager)
+    {
+        Camera cam = Camera.main;
+
+        cam.orthographicSize = 3f;
+        hudManager.UICamera.orthographicSize = 3f;
+
+        if (_resolutionChangeNeeded)
+        {
+            Utils.AdjustResolution();
+            _resolutionChangeNeeded = false;
         }
     }
 
@@ -83,117 +111,190 @@ public static class MalumESP
         {
             foreach (var playerState in meetingHud.playerStates)
             {
-                // Fetch the NetworkedPlayerInfo of each playerState
                 var data = GameData.Instance.GetPlayerById(playerState.TargetPlayerId);
 
-                if (data.IsNull() || data.Disconnected || data.Outfits[PlayerOutfitType.Default].IsNull()) continue;
+                if (data.IsNull() ||
+                    data.Disconnected ||
+                    data.Outfits[PlayerOutfitType.Default].IsNull())
+                    continue;
 
-                // Update the player's nametag appropriately
-                playerState.NameText.text = Utils.GetNameTag(data, data.DefaultOutfit.PlayerName);
+                Color color = Palette.PlayerColors[data.DefaultOutfit.ColorId];
+                string dot = PlayerColorDot(color);
 
-                // Move and resize the nametag to prevent it overlapping with colorblind text
-                if (CheatToggles.seeRoles && CheatToggles.seePlayerInfo)
-                {
-                    playerState.NameText.transform.localPosition = new Vector3(0.33f, 0.08f, 0f);
-                    playerState.NameText.transform.localScale = new Vector3(0.75f, 0.75f, 0.75f);
-                }
-                else if (CheatToggles.seeRoles || CheatToggles.seePlayerInfo)
-                {
-                    playerState.NameText.transform.localPosition = new Vector3(0.3384f, 0.1125f, -0.1f);
-                    playerState.NameText.transform.localScale = new Vector3(0.9f, 1f, 1f);
-                }
-                else
-                {
-                    // Reset the position and scale of the nametag to default values (they're kinda weird but whatever)
-                    playerState.NameText.transform.localPosition = new Vector3(0.3384f, 0.0311f, -0.1f);
-                    playerState.NameText.transform.localScale = new Vector3(0.9f, 1f, 1f);
-                }
+                string name = Utils.GetNameTag(data, data.DefaultOutfit.PlayerName);
+
+                playerState.NameText.text = dot + " " + name;
+
+                ApplyMeetingNameLayout(playerState.NameText.transform);
             }
-        } catch { }
+        }
+        catch { }
+    }
+
+    private static void ApplyMeetingNameLayout(Transform t)
+    {
+        if (CheatToggles.seeRoles && CheatToggles.seePlayerInfo)
+        {
+            t.localPosition = new Vector3(0.33f, 0.08f, 0f);
+            t.localScale = new Vector3(0.75f, 0.75f, 0.75f);
+        }
+        else if (CheatToggles.seeRoles || CheatToggles.seePlayerInfo)
+        {
+            t.localPosition = new Vector3(0.3384f, 0.1125f, -0.1f);
+            t.localScale = new Vector3(0.9f, 1f, 1f);
+        }
+        else
+        {
+            t.localPosition = new Vector3(0.3384f, 0.0311f, -0.1f);
+            t.localScale = new Vector3(0.9f, 1f, 1f);
+        }
     }
 
     public static void PlayerNametags(PlayerPhysics playerPhysics)
     {
         try
         {
-            playerPhysics.myPlayer.cosmetics.SetName(Utils.GetNameTag(playerPhysics.myPlayer.Data, playerPhysics.myPlayer.CurrentOutfit.PlayerName));
-            // Move the nameText up to prevent it overlapping with colorblind text
-            if (CheatToggles.seeRoles && CheatToggles.seePlayerInfo)
-            {
-                playerPhysics.myPlayer.cosmetics.nameText.transform.localPosition = new Vector3(0f, 0.186f, 0f);
-            }
-            else if (CheatToggles.seeRoles || CheatToggles.seePlayerInfo)
-            {
-                playerPhysics.myPlayer.cosmetics.nameText.transform.localPosition = new Vector3(0f, 0.093f, 0f);
-            }
-            else
-            {
-                playerPhysics.myPlayer.cosmetics.nameText.transform.localPosition = new Vector3(0f, 0f, 0f);
-            }
-        } catch { }
+            var data = playerPhysics.myPlayer.Data;
+            string name = playerPhysics.myPlayer.CurrentOutfit.PlayerName;
+
+            Color color = Palette.PlayerColors[data.DefaultOutfit.ColorId];
+            string dot = PlayerColorDot(color);
+
+            playerPhysics.myPlayer.cosmetics.SetName(
+                dot + " " + Utils.GetNameTag(data, name)
+            );
+
+            ApplyPlayerNameLayout(playerPhysics.myPlayer.cosmetics.nameText.transform);
+        }
+        catch { }
+    }
+
+    private static void ApplyPlayerNameLayout(Transform t)
+    {
+        if (CheatToggles.seeRoles && CheatToggles.seePlayerInfo)
+            t.localPosition = new Vector3(0f, 0.186f, 0f);
+        else if (CheatToggles.seeRoles || CheatToggles.seePlayerInfo)
+            t.localPosition = new Vector3(0f, 0.093f, 0f);
+        else
+            t.localPosition = Vector3.zero;
     }
 
     public static void ChatNametags(ChatBubble chatBubble)
     {
         try
         {
-            // Update the player's nametag appropriately
-            chatBubble.NameText.text = Utils.GetNameTag(chatBubble.playerInfo, chatBubble.NameText.text, true);
+            Color color = Palette.PlayerColors[chatBubble.playerInfo.DefaultOutfit.ColorId];
+            string dot = PlayerColorDot(color);
 
-            // Adjust the chatBubble's size to the new nametag to prevent issues
+            string name = Utils.GetNameTag(
+                chatBubble.playerInfo,
+                chatBubble.NameText.text,
+                true
+            );
+
+            chatBubble.NameText.text = dot + " " + name;
+
             chatBubble.NameText.ForceMeshUpdate(true, true);
-            chatBubble.Background.size = new Vector2(5.52f, 0.2f + chatBubble.NameText.GetNotDumbRenderedHeight() + chatBubble.TextArea.GetNotDumbRenderedHeight());
-            chatBubble.MaskArea.size = chatBubble.Background.size - new Vector2(0f, 0.03f);
 
-        } catch { }
+            float height =
+                chatBubble.NameText.GetNotDumbRenderedHeight() +
+                chatBubble.TextArea.GetNotDumbRenderedHeight();
+
+            chatBubble.Background.size = new Vector2(
+                5.52f,
+                0.2f + height
+            );
+
+            chatBubble.MaskArea.size =
+                chatBubble.Background.size - new Vector2(0f, 0.03f);
+        }
+        catch { }
     }
 
     public static void SeeGhostsCheat(PlayerPhysics playerPhysics)
     {
-        try{
+        try
+        {
+            bool isDead = playerPhysics.myPlayer.Data.IsDead;
+            bool localAlive = !PlayerControl.LocalPlayer.Data.IsDead;
 
-            if(playerPhysics.myPlayer.Data.IsDead && !PlayerControl.LocalPlayer.Data.IsDead)
+            if (isDead && localAlive)
             {
                 playerPhysics.myPlayer.Visible = CheatToggles.seeGhosts;
             }
-
-        }catch{}
+        }
+        catch { }
     }
 
     public static void FreecamCheat()
     {
+        Camera cam = Camera.main;
+        FollowerCamera follower = cam.GetComponent<FollowerCamera>();
+
         if (CheatToggles.freecam)
         {
-            // Completely disable FollowerCamera
             if (!_freecamActive)
             {
-
-                Camera.main.gameObject.GetComponent<FollowerCamera>().enabled = false;
-                Camera.main.gameObject.GetComponent<FollowerCamera>().Target = null;
-
+                follower.enabled = false;
+                follower.Target = null;
                 _freecamActive = true;
-
             }
 
-            // Prevent the player from moving while in freecam
             PlayerControl.LocalPlayer.moveable = false;
 
-            // Get keyboard input
-            var movement = new Vector3(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"), 0.0f);
-
-            // Change the camera's position depending on the keyboard input
-            // Speed: 10f
-            Camera.main.transform.position = Camera.main.transform.position + movement * 10f * Time.deltaTime;
-
+            Vector3 move = new Vector3(
+                Input.GetAxis("Horizontal"),
+                Input.GetAxis("Vertical"),
+                0f
+            );
+    
+            cam.transform.position += move * (10f * Time.deltaTime);
         }
         else
         {
-            // Re-enable FollowerCamera & movement once freecam is disabled
-            if (!_freecamActive) return;
+            if (!_freecamActive)
+                return;
+    
             PlayerControl.LocalPlayer.moveable = true;
-            Camera.main.gameObject.GetComponent<FollowerCamera>().enabled = true;
-            Camera.main.gameObject.GetComponent<FollowerCamera>().SetTarget(PlayerControl.LocalPlayer);
+    
+            follower.enabled = true;
+            follower.SetTarget(PlayerControl.LocalPlayer);
+
             _freecamActive = false;
         }
+    }
+
+    public static void DrawFPS()
+    {
+        if (!CheatToggles.showFPS)
+            return;
+
+        _deltaTime += (Time.unscaledDeltaTime - _deltaTime) * 0.1f;
+
+        int fps = Mathf.CeilToInt(1.0f / _deltaTime);
+
+        Color fpsColor =
+            fps >= 60 ? Color.white :
+            fps >= 30 ? Color.yellow :
+            Color.red;
+
+        string text = $"{fps} FPS";
+
+        GUIStyle style = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 14,
+            normal = { textColor = Color.white }
+        };
+
+        Vector2 size = style.CalcSize(new GUIContent(text));
+
+        Rect bg = new Rect(10, 10, size.x + 10, size.y + 6);
+        Rect label = new Rect(15, 13, 200, 30);
+
+        GUI.color = new Color(0f, 0f, 0f, 0.6f);
+        GUI.Box(bg, "");
+
+        GUI.color = Color.white;
+        GUI.Label(label, text, style);
     }
 }
