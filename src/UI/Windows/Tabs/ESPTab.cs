@@ -49,6 +49,8 @@ public class ESPTab : ITab
 
         CheatToggles.seeLobbyInfo = GUILayout.Toggle(CheatToggles.seeLobbyInfo, " See Lobby Info");
     }
+        CheatToggles.playerColorDot = GUILayout.Toggle(CheatToggles.playerColorDot, " Show player color dot);
+    }
 
     private void DrawCamera()
     {
