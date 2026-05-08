@@ -7,11 +7,10 @@ public static class MalumESP
 {
     private static bool _freecamActive;
     private static bool _resolutionChangeNeeded;
-    private static float _deltaTime;
 
     public static string PlayerColorDot(Color color)
     {
-        if (!CheatToggles.showPlayerDots)
+        if (!CheatToggles.playerColorDot)
           return "";
 
         string hexColor = ColorUtility.ToHtmlStringRGB(color);
@@ -262,39 +261,5 @@ public static class MalumESP
 
             _freecamActive = false;
         }
-    }
-
-    public static void DrawFPS()
-    {
-        if (!CheatToggles.showFPS)
-            return;
-
-        _deltaTime += (Time.unscaledDeltaTime - _deltaTime) * 0.1f;
-
-        int fps = Mathf.CeilToInt(1.0f / _deltaTime);
-
-        Color fpsColor =
-            fps >= 60 ? Color.white :
-            fps >= 30 ? Color.yellow :
-            Color.red;
-
-        string text = $"{fps} FPS";
-
-        GUIStyle style = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 14,
-            normal = { textColor = Color.white }
-        };
-
-        Vector2 size = style.CalcSize(new GUIContent(text));
-
-        Rect bg = new Rect(10, 10, size.x + 10, size.y + 6);
-        Rect label = new Rect(15, 13, 200, 30);
-
-        GUI.color = new Color(0f, 0f, 0f, 0.6f);
-        GUI.Box(bg, "");
-
-        GUI.color = Color.white;
-        GUI.Label(label, text, style);
     }
 }

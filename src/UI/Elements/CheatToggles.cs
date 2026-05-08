@@ -48,7 +48,7 @@ public struct CheatToggles
     public static bool taskArrows;
     public static bool revealVotes;
     public static bool seeLobbyInfo;
-    public static bool PlayerColorDot;
+    public static bool playerColorDot;
 
     // Camera
     public static bool spectate;
