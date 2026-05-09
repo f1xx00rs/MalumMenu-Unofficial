@@ -8,7 +8,7 @@
 
         <VersionPrefix>1.3.3</VersionPrefix>
         <Description>MalumMenu Unofficial</Description>
-        <Authors>scp222thj, astra1dev (Unofficial by f1xx0rs)</Authors>
+        <Authors>f1xx0rs</Authors>
     </PropertyGroup>
 
     <!--<ItemGroup>
