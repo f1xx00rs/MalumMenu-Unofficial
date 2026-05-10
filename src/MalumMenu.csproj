@@ -6,7 +6,7 @@
 
         <AssemblyName>MalumMenuUnofficial</AssemblyName>
 
-        <VersionPrefix>1.3.3</VersionPrefix>
+        <VersionPrefix>1.3.4</VersionPrefix>
         <Description>MalumMenu Unofficial</Description>
         <Authors>f1xx0rs</Authors>
     </PropertyGroup>

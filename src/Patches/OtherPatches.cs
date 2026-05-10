@@ -93,11 +93,11 @@ public static class VersionShower_Start
 
         if (MalumMenu.supportedAU.Contains(Application.version)) // Checks if Among Us version is supported
         {
-            __instance.text.text =  $"MalumMenu v{MalumMenu.malumVersion} (v{Application.version})"; // Supported
+            __instance.text.text =  $"MalumMenu Unofficial v{MalumMenu.malumVersion} (v{Application.version})"; // Supported
         }
         else
         {
-            __instance.text.text =  $"MalumMenu v{MalumMenu.malumVersion} (<color=red>v{Application.version}</color>)"; // Unsupported
+            __instance.text.text =  $"MalumMenu Unofficial v{MalumMenu.malumVersion} (<color=red>v{Application.version}</color>)"; // Unsupported
         }
     }
 }
@@ -119,7 +119,7 @@ public static class PingTracker_Update
         string pingText = Utils.GetColoredPingText($"PING: {ping} ms", ping);
 
         string infoLine = $"{pingText}";
-        string creditLine = "MalumMenu by scp222thj & Astral";
+        string creditLine = "MalumMenu Unofficial by f1xx0rs";
 
         if (AmongUsClient.Instance != null && AmongUsClient.Instance.IsGameStarted)
         {
